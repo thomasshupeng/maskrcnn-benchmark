@@ -54,10 +54,13 @@ class BinaryMaskList(object):
         elif isinstance(masks, (list, tuple)):
             if isinstance(masks[0], torch.Tensor):
                 masks = torch.stack(masks, dim=2).clone()
-            elif isinstance(masks[0], dict) and "count" in masks[0]:
+            elif isinstance(masks[0], dict) and "counts" in masks[0]:
                 # RLE interpretation
-
-                masks = mask_utils
+                assert all(
+                    [(size[1], size[0]) == tuple(inst["size"]) for inst in masks]
+                )  # in RLE, height come first in "size"
+                masks = mask_utils.decode(masks)  # [h, w, n]
+                masks = torch.tensor(masks).permute(2, 0, 1)  # [n, h, w]
             else:
                 RuntimeError(
                     "Type of `masks[0]` could not be interpreted: %s" % type(masks)
@@ -67,7 +70,7 @@ class BinaryMaskList(object):
             masks = masks.masks.clone()
         else:
             RuntimeError(
-                "Type of `masks` argument could not be interpreted:%s" % tpye(masks)
+                "Type of `masks` argument could not be interpreted:%s" % type(masks)
             )
 
         if len(masks.shape) == 2:
@@ -524,7 +527,7 @@ class SegmentationMask(object):
             self.iter_idx += 1
             return next_segmentation
         raise StopIteration()
-        
+
     next = __next__  # Python 2 compatibility
 
     def __repr__(self):
